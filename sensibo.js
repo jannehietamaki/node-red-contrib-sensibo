@@ -71,26 +71,22 @@ module.exports = function (RED) {
       })
   }
 
-  const patchPods = (key, id, patch) => {
-    const qs = {
-      apiKey: key,
-      fields: 'acState'
-    }
-
-    console.log('Patching pod:' + id + ' with API key ' + key)
-    return request('get', apiRoot + '/pods/' + id, { qs, json: true, timeout: 5000 })
-      .then((data) => {
-        console.log('Old state', data.result);
-        return changeState(key, id, data.result.acState, patch)
-      })
+  const setProperties = (apiKey, id, key, body) => {
+    console.log('Patching pod:' + id + ' with API key ' + apiKey, { key, value })
+    return request('put', apiRoot + '/pods/' + id + '/' + key, {
+      qs: { apiKey },
+      body,
+      json: true,
+    });
   }
 
-  // WARNING: This method modifies the acState object in place
-  const changeState = (apiKey, id, acState, patch) => {
-    const qs = { apiKey }
-    acState = _.merge(acState, patch)
-    console.log('changeState', id, acState);
-    return request('post', apiRoot + '/pods/' + id + '/acStates', { qs, body: { acState }, json: true })
+  const patchPods = (apiKey, id, acState) => {
+    console.log('Patching pod:' + id + ' with API key ' + apiKey, acState)
+    return request('post', apiRoot + '/pods/' + id + '/acStates', {
+      qs: { apiKey },
+      body: { acState },
+      json: true,
+    });
   }
 
   function sensiboGet (config) {
@@ -214,59 +210,63 @@ module.exports = function (RED) {
       node = this
       // parse message
       console.log('Input message is:' + JSON.stringify(msg))
+      if (msg.key != null && msg.command != null) {;
+        console.log('SetProperty Command is:' + JSON.stringify(msg.command))
+        var performPatch = setProperties(node.api.sensibo_api, config.pod, msg.key, msg.command)
+          .then((cmdData) => {
+            msg.payload = cmdData
+            node.status({ fill: 'green', shape: 'dot', text: 'connected' })
+            send(msg)
+            // Check done exists (1.0+)
+            if (done) {
+              done()
+            }
+          })
+          .catch(function (err) {
+            // grab the error messasge and send as payload.
+            msg.payload = err.message
+            // Report back the error
+            if (done) {
+              // Use done if defined (1.0+)
+              done(err)
+            } else {
+              // Fallback to node.error (pre-1.0)
+              node.error(err, msg)
+            }
+            node.status({ fill: 'red', shape: 'dot', text: 'error' })
+            send(msg)
+          })
+      } else {
+        const cmdData = _.pick(msg, ['on', 'swing', 'mode', 'fanlevel', 'targetTemperature']);
+        console.log('Compiled Command is:' + JSON.stringify(cmdData))
 
-      const cmdData = {}
-      // #TODO - Map against possible values and validate
+        var performPatch = patchPods(node.api.sensibo_api, config.pod, cmdData)
+          .then((cmdData) => {
+            msg.payload = cmdData
+            node.status({ fill: 'green', shape: 'dot', text: 'connected' })
+            send(msg)
+            // Check done exists (1.0+)
+            if (done) {
+              done()
+            }
+          })
 
-      if (typeof msg.on !== 'undefined') {
-        if (msg.on === 'true') {
-          cmdData.on = true
-        } else {
-          cmdData.on = false
-        };
-      };
+          .catch(function (err) {
+            // grab the error messasge and send as payload.
+            msg.payload = err.message
+            // Report back the error
+            if (done) {
+              // Use done if defined (1.0+)
+              done(err)
+            } else {
+              // Fallback to node.error (pre-1.0)
+              node.error(err, msg)
+            }
 
-      if (typeof msg.swing !== 'undefined') {
-        cmdData.swing = msg.swing
-      };
-      if (typeof msg.mode !== 'undefined') {
-        cmdData.mode = msg.mode
-      };
-      if (typeof msg.fanlevel !== 'undefined') {
-        cmdData.fanLevel = msg.fanlevel
-      };
-      if (typeof msg.targetTemperature !== 'undefined') {
-        cmdData.targetTemperature = msg.targetTemperature
-      };
-
-      console.log('Compiled Command is:' + JSON.stringify(cmdData))
-
-      var performPatch = patchPods(node.api.sensibo_api, config.pod, cmdData)
-        .then((cmdData) => {
-          msg.payload = cmdData
-          node.status({ fill: 'green', shape: 'dot', text: 'connected' })
-          send(msg)
-          // Check done exists (1.0+)
-          if (done) {
-            done()
-          }
-        })
-
-        .catch(function (err) {
-          // grab the error messasge and send as payload.
-          msg.payload = err.message
-          // Report back the error
-          if (done) {
-            // Use done if defined (1.0+)
-            done(err)
-          } else {
-            // Fallback to node.error (pre-1.0)
-            node.error(err, msg)
-          }
-
-          node.status({ fill: 'red', shape: 'dot', text: 'error' })
-          send(msg)
-        })
+            node.status({ fill: 'red', shape: 'dot', text: 'error' })
+            send(msg)
+          })
+      }
     })
   }
 

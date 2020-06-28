@@ -80,6 +80,7 @@ module.exports = function (RED) {
     console.log('Patching pod:' + id + ' with API key ' + key)
     return request('get', apiRoot + '/pods/' + id, { qs, json: true, timeout: 5000 })
       .then((data) => {
+        console.log('Old state', data.result);
         return changeState(key, id, data.result.acState, patch)
       })
   }

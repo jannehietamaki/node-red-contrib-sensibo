@@ -88,7 +88,7 @@ module.exports = function (RED) {
   const changeState = (apiKey, id, acState, patch) => {
     const qs = { apiKey }
     acState = _.merge(acState, patch)
-
+    console.log('changeState', id, acState);
     return request('post', apiRoot + '/pods/' + id + '/acStates', { qs, body: { acState }, json: true })
   }
 
@@ -212,8 +212,11 @@ module.exports = function (RED) {
       this.status({ fill: 'green', shape: 'ring', text: 'sending' })
       node = this
       // parse message
+      console.log('Input message is:' + JSON.stringify(msg))
+
       const cmdData = {}
       // #TODO - Map against possible values and validate
+
       if (typeof msg.on !== 'undefined') {
         if (msg.on === 'true') {
           cmdData.on = true
@@ -221,6 +224,7 @@ module.exports = function (RED) {
           cmdData.on = false
         };
       };
+
       if (typeof msg.swing !== 'undefined') {
         cmdData.swing = msg.swing
       };
@@ -234,7 +238,7 @@ module.exports = function (RED) {
         cmdData.targetTemperature = msg.targetTemperature
       };
 
-      // console.log('Compiled Command is:' + JSON.stringify(cmdData))
+      console.log('Compiled Command is:' + JSON.stringify(cmdData))
 
       var performPatch = patchPods(node.api.sensibo_api, config.pod, cmdData)
         .then((cmdData) => {

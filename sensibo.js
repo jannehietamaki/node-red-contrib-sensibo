@@ -72,7 +72,7 @@ module.exports = function (RED) {
   }
 
   const setProperties = (apiKey, id, key, body) => {
-    console.log('Patching pod:' + id + ' with API key ' + apiKey, { key, value })
+    console.log('Patching pod:' + id + ' with API key ' + apiKey, { key, body })
     return request('put', apiRoot + '/pods/' + id + '/' + key, {
       qs: { apiKey },
       body,
